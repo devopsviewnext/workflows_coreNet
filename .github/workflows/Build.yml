@@ -14,7 +14,7 @@ jobs:
     name: Build And Upload Artefact To Nuget NET
     env:
         APP_NAME: DummyCoreNet    
-        NUGET_AUTH_TOKEN: ${{ secrets.UPLOAD_PACKAGE_TOKEN }}    
+        NUGET_AUTH_TOKEN: ${{ secrets.PACKAGE_TOKEN }}    
     steps:
       - name: Git Checkout Repository
         uses: actions/checkout@v2
