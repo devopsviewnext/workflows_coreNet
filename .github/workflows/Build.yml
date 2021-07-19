@@ -1,17 +1,23 @@
 name: NET Nuget CI
 
-on:
-  push:    
-  pull_request:
-    branches: [ master, develop ]
+on:  
+  push:  
+    branches-ignore: [ develop, staging ]    
     paths:
     - 'DummyCoreNet/**'
     - '!.github/**'
+  pull_request:  
+    branches: [ develop, staging ]
+    paths:
+    - 'DummyCoreNet/**'
+    - '!.github/**'
+  release:
+    types: [ created ]
 
 jobs:
-  Build_and_Upload_Artefact_To_Nuget:
+  Build:
     runs-on: ubuntu-latest
-    name: Build And Upload Artefact To Nuget NET
+    name: Build And Upload Artifact To Nuget NET
     env:
         APP_NAME: DummyCoreNet    
         NUGET_AUTH_TOKEN: ${{ secrets.PACKAGE_TOKEN }}    
@@ -28,11 +34,68 @@ jobs:
         run: |
           dotnet build ${{ env.APP_NAME }} --configuration Release 
       
-      - if: github.event_name  == 'pull_request' && ( github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' )
-        name: Create the package
-        run: dotnet pack --configuration Release ${{ env.APP_NAME }}
+  DeployDev:
+    name: Deploy to Dev 
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    needs: [Build]
+    runs-on: ubuntu-latest
+    environment: 
+      name: Development
+      url: 'http://someweb.com'
+    steps:
+      - name: Deploy
+        run: echo Deploying Dev....   
 
-      - if: github.event_name  == 'pull_request' && ( github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' )      
-        name: Publish the package
+      - name: Create the package
+        run: dotnet pack --configuration Release ${{ env.APP_NAME }}
+      
+      - name: Publish the package
         run: dotnet nuget push ${{ env.APP_NAME }}/bin/Release/*.nupkg
+    
+  DeployPreproduction:
+    name: Deploy to Preproduction 
+    needs: [Build]
+    if: github.event_name == 'pull_request' && github.base_ref == 'staging'
+    runs-on: ubuntu-latest
+    environment: 
+      name: Preproduction
+      url: 'http://someweb.com'
+    steps:
+      - name: Deploy
+        run: echo I am deploying!!!
+  
+  TaggingDeployPreproduction:
+    needs: [DeployPreproduction]    
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2 
+
+      - name: Tagging to Staging Branch        
+        run: |
+            deploymentTag=$(date +'v%Y.%m.%d.%H%M')
+            echo "$GITHUB_CONTEXT"
+            echo "Tag Id: $deploymentTag"
+            messageTag="Tag $deploymentTag created automatically due to the merge request to staging branch with details: Commit hash: ${{ github.sha }} Username: ${{ github.actor }}."
+            echo "Message Tag: $messageTag"            
+            git config --global user.email ""
+            git config --global user.name "${{ github.actor }}"
+            git tag -a $deploymentTag -m "$messageTag"
+            echo "Tag created: $deploymentTag into staging branch."
+            git push --tags --progress
+            echo "Push created with tag: $deploymentTag"
+            
+  DeployProduction:
+    name: Deploy to Production 
+    if: github.event_name == 'release'
+    needs: [Build]
+    runs-on: ubuntu-latest
+    environment: 
+      name: Production
+      url: 'http://someweb.com'
+    steps:
+      - name: Deploy
+        run: echo I am deploying! 
+
+      
+
         
