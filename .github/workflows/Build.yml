@@ -1,0 +1,39 @@
+name: NET Nuget CI
+
+on:
+  push:    
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+    - 'DummyCoreNet/**'
+    - '!.github/**'
+
+jobs:
+  Build_and_Upload_Artefact_To_Nuget:
+    needs: Init
+    runs-on: ubuntu-latest
+    name: Build And Upload Artefact To Nuget NET
+    env:
+        APP_NAME: DummyCoreNet    
+        NUGET_AUTH_TOKEN: ${{ secrets.UPLOAD_PACKAGE_TOKEN }}    
+    steps:
+      - name: Git Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v1
+        with:            
+            source-url: https://nuget.pkg.github.com/luismartinezpage/index.json
+        
+      - name: Build application
+        run: |
+          dotnet build ${{ env.APP_NAME }} --configuration Release 
+      
+      - if: github.event_name  == 'pull_request' && ( github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' )
+        name: Create the package
+        run: dotnet pack --configuration Release ${{ env.APP_NAME }}
+
+      - if: github.event_name  == 'pull_request' && ( github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' )      
+        name: Publish the package
+        run: dotnet nuget push ${{ env.APP_NAME }}/bin/Release/*.nupkg
+        
